@@ -1,0 +1,1 @@
+Folder for storing epoch cashes via SHA224 hash of configurations
