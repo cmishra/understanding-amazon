@@ -127,8 +127,6 @@ def train_model(args):
     cache_name = encode_args(args)
     foldername = os.path.join(args.cache_filepath, cache_name)
 
-    
-
     model = retrieve_model(args.model)
     model.load_state_dict(
         torch.load(os.path.join(foldername, '000_model.tpy'))
@@ -140,6 +138,9 @@ def train_model(args):
     # )
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
+
+    if args.debug:
+        logger.info("Debug mode enabled")
 
     valdir = os.path.join(args.data, 'val')
     traindir = os.path.join(args.data, 'train')
@@ -155,6 +156,7 @@ def train_model(args):
                 normalize,
             ]),
             logger,
+            args.debug,
         ),
         batch_size=args.batch_size,
         shuffle=True,
@@ -172,17 +174,19 @@ def train_model(args):
                 normalize,
             ]),
             logger,
+            args.debug,
         ),
         batch_size=args.batch_size,
         shuffle=False,
         num_workers=args.workers,
     )
-    
 
     criterion = retrieve_criterion(args).cuda()
 
     is_best = 1000
 
+    if args.debug:
+        epoch = 6
     for epoch in range(0, args.epochs):
         logstring = train(train_loader, model, criterion, optimizer, epoch)
         val_loss = evaluate(val_loader, model, criterion)
@@ -229,6 +233,9 @@ if __name__ == '__main__':
     parser.add_argument("--criterion",
                         help="error criterion to use for training",
     )
+    parser.add_argument("--debug",
+                        action="store_true",
+                        help="are we making sure the code works? Trains at 10% size")
     args = parser.parse_args()
 
     cache_name = encode_args(args)

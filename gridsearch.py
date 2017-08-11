@@ -16,6 +16,7 @@ most_args = {
     "lr": "0.01",
     "weight_decay": "0.0001",
     "criterion": "mse",
+#    "debug": "",
 }
 
 
@@ -27,14 +28,10 @@ def args_to_command(args):
 
 
 if __name__ == "__main__":
-    lr_candidates = np.random.uniform(-5, -1, 2)
-    weight_decay_candidates = np.random.uniform(-6, -2, 2)
-    for c in ["mse", "l1"]:
-        for lr in lr_candidates:
-            for w in weight_decay_candidates:
-                args = most_args.copy()
-                args["lr"] = 10 ** lr
-                args["weight_decay"] = 10 ** w
-                args["criterion"] = c
-                subprocess.run(args_to_command(args), shell=True)
+    num_runs = 50
+    for i in range(0, num_runs):
+        args = most_args.copy()
+        args["lr"] = 10 ** np.random.uniform(-5, -1, 1)[0]
+        args["weight_decay"] = 10 ** np.random.uniform(-6, -2, 1)[0]
+        subprocess.run(args_to_command(args), shell=True)
 

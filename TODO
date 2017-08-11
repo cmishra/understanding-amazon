@@ -1,0 +1,1 @@
+# Why are my L1 losses so insanely high? gradients will be useless most likely. Do i need to divide by N?

@@ -8,3 +8,6 @@ logs:
 
 clean:
 	rm -rf epoch_cache/*
+
+kill:
+	jbadmin -kill -proj understanding_amazon -state r all

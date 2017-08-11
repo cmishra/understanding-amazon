@@ -8,9 +8,11 @@ import numpy as np
 
 class SatelliteData(torch.utils.data.Dataset):
 
-    def __init__(self, filepath, target_json, compose, logger):
+    def __init__(self, filepath, target_json, compose, logger, debug_mode):
         logger.info("Initializing dataset.")
         images_names = os.listdir(filepath)
+        if debug_mode:
+            images_names = images_names[:(64*30)]
         images = {}
         for f in images_names:
             f_key = f[:-4]
