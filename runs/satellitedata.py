@@ -2,38 +2,36 @@ import pandas
 import torch
 from PIL import Image
 import os
-import logging
+import json
+import numpy as np
+
 
 class SatelliteData(torch.utils.data.Dataset):
 
-    def __init__(self, filepath, target_csv, compose):
-        logging.log(20, "Initializing dataset")
-        targets = pandas.read_csv(target_csv)
-        tag_list = set()
-        for tag_description in targets['tags']:
-            tags = tag_description.split(' ')
-            for t in tags:
-                tag_list.add(t)
-        for t in tag_list:
-            targets[t] = targets['tags'].apply(lambda x: 1 if t in x.split(' ') else 0)
-        self.targets = targets
-
+    def __init__(self, filepath, target_json, compose, logger):
+        logger.info("Initializing dataset.")
         images_names = os.listdir(filepath)
         images = {}
         for f in images_names:
-            with Image.open(os.path.join(filepath, f)) as f_bytes:
-                images[f] = f_bytes
+            f_key = f[:-4]
+            with Image.open(os.path.join(filepath, f)) as img_pil:
+                images[f_key] = img_pil.convert("RGB")
+
+        with open(target_json, 'r') as f:
+            self.targets = json.load(f)
+                
         self.images = images
         self.compose = compose
-        logging.log(20, "Initialized dataset. %d rows" % len(self))
+        self.keys = list(self.images.keys())
+        logger.info("Initialized dataset. %d rows" % len(self))
 
 
     def __getitem__(self, index):
-        target_row = self.targets.iloc[index]
-        img = target_row['image_name']
-        y = target_row[1:]
-        return self.compose(self.images[img]), y
+        img = self.keys[index]
+        return self.compose(self.images[img]), torch.FloatTensor(self.targets[img])
 
 
     def __len__(self):
         return len(self.images)
+
+

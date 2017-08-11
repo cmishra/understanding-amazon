@@ -1,14 +1,16 @@
 RAW_DATA:= /u/cmishra1/understanding_amazon/data_raw
 PROCESSED_DATA:= /u/cmishra1/understanding_amazon/data_processed
-PYTHON_EXE:= /opt/share/Python-3.5.2/x86_64/bin/python3
+PYTHON_EXE:= /opt/share/Python-2.7.12/x86_64/bin/python
 
-EXTRACTION_TARGETS:= $(PROCESSED_DATA)/test-jpg $(PROCESSED_DATA)/train_v2.csv $(PROCESSED_DATA)/train-jpg
+EXTRACTION_TARGETS:= $(PROCESSED_DATA)/test-jpg $(PROCESSED_DATA)/targets.json $(PROCESSED_DATA)/train-jpg
 
 .DEFAULT_GOAL:= all
 
-$(PROCESSED_DATA)/train_v2.csv:
+$(PROCESSED_DATA)/targets.json:
 	unzip -u $(RAW_DATA)/train_v2.csv.zip -d $(PROCESSED_DATA)
 	rm -rf $(PROCESSED_DATA)/__MACOSX
+	python csv_to_json.py --train_csv $(PROCESSED_DATA)/train_v2.csv --output $(PROCESSED_DATA)/targets.json
+	rm $(PROCESSED_DATA)/train_v2.csv
 
 $(PROCESSED_DATA)/test-jpg:
 	jbsub -interactive -queue x86_1h -mem 50G tar -xf $(RAW_DATA)/test-jpg.tar -C $(PROCESSED_DATA)

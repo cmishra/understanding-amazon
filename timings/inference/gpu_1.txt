@@ -1,0 +1,15 @@
+# bsub -q x86_6h -g /cmishra1/_/default -M 20480 -hl -n 1 -R \
+    rusage[mem=21504,ngpus_excl_p=1] affinity[core(1)] -Is python \
+    runs/train.py --data data_processed --cache_filepath epoch_cache \
+    --model alexnet --workers 1 --epochs 1 --batch_size 1 --optimizer adam \
+    --momentum 0.0 --lr_schedule Constant --lr 0.001 --weight_decay 0.0001 \
+    --criterion mse
+Job <879996> is submitted to queue <x86_6h>.
+Cache folder 745df8537cc7403854713ed8aeb7a4dda08939a6880f021ae500a838 exists -- deleting and recreating
+Model, optimizer  initialized and saved in cache folder epoch_cache/745df8537cc7403854713ed8aeb7a4dda08939a6880f021ae500a838
+Initializing dataset.
+Initialized dataset. 8096 rows
+Evaluating model.
+Per-batch processing time (seconds):	0.006188
+Total evaluation time (seconds):	50.101305
+Average loss:		0.251362

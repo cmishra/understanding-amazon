@@ -1,3 +1,10 @@
 # emacs autosaves
 *~
 *#
+
+# python autosaves
+*.pyc
+
+# data
+data_processed
+data_raw
