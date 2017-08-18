@@ -213,7 +213,7 @@ def train_model(args):
     with open(os.path.join(foldername, 'params.json'), 'r') as f:
         args = json.load(f)
     args["best_val"] = is_best["score"]
-    args["model"] = is_best["model"]
+    args["model"] = is_best["model"].tobytes()
     with open(os.path.join(foldername, 'params.json'), 'w') as f:
         json.dump(args, f)
 
