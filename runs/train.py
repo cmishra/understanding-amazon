@@ -1,7 +1,7 @@
 import argparse
 import os
 import json
-
+import numpy as np
 import torchvision
 import torchvision.transforms as transforms
 import torch
@@ -12,6 +12,7 @@ from utils import AverageMeter
 import hashlib
 import time
 import logging
+from sklearn.metrics import fbeta_score
 
 logger = None
 
@@ -20,7 +21,7 @@ def encode_args(args):
 
 def retrieve_model(model_param):
     if args.model == 'alexnet':
-        model = torchvision.models.alexnet(pretrained=True)
+        model = torchvision.models.alexnet(pretrained=args.pretrained)
         model.classifier = nn.Sequential(
             model.classifier[0],
             model.classifier[1],
@@ -32,6 +33,8 @@ def retrieve_model(model_param):
         )
         model.train()
         return model
+    elif args.model == "densenet201":
+        model = torchvision.models.densenet201(pretrained=args.pretrained)
     else:
         logger.critical("Model %s is not implemented" % args.model)
 
@@ -71,26 +74,34 @@ def init_model(args):
     logger.info("Model, optimizer  initialized and saved in cache folder %s" % foldername)
     
     
-    
+def f_score(y, y_pred, averaging, threshold=0.5):
+    return fbeta_score(y, np.array(y_pred > threshold, dtype=float), 2, average=averaging)
+
+
 def evaluate(val_loader, model, criterion):
     batch_time = AverageMeter()
     losses = AverageMeter()
+    fbeta_score_samples = AverageMeter()
+    fbeta_score_micro = AverageMeter()
 
+    actuals = []
+    preds = []
     model.eval()
-    end = time.time()
     for i, (x, y) in enumerate(val_loader):
         input_var = autograd.Variable(x, volatile=True).cuda()
         output_var = autograd.Variable(y, volatile=True).cuda()
         pred = model(input_var)
         loss = criterion(pred, output_var)
+        actuals.append(y)
+        preds.append(pred.cpu().data)
         losses.update(loss.cpu().data.numpy()[0])
-        batch_time.update(time.time() - end)
-        end = time.time()
-
-#    logger.info("Per-batch processing time (seconds):\t%f" % batch_time.avg)
-#    logger.info("Total evaluation time (seconds):\t%f" % batch_time.sum)
+        
     model.train()
-    return losses.sum
+
+    actual = torch.cat(actuals, 0).numpy()
+    pred = torch.cat(preds, 0).numpy()
+
+    return losses.sum, f_score(actual, pred, 'samples'), f_score(actual, pred, 'micro')
 
 
 def train(train_loader, model, criterion, optimizer, epoch):
@@ -133,9 +144,6 @@ def train_model(args):
     )
     model.cuda()
     optimizer = retrieve_optimizer(args, model.parameters())
-    # optimizer.load_state_dict(
-    #     torch.load(os.path.join(foldername, '000_optimizer.tpy')),
-    # )
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
 
@@ -183,18 +191,32 @@ def train_model(args):
 
     criterion = retrieve_criterion(args).cuda()
 
-    is_best = 1000
+    is_best = {
+        "score": 0.0,
+        "model_type": "",
+        "model": 0.0,
+    }
 
     if args.debug:
-        epoch = 6
+        args.epochs = 6
     for epoch in range(0, args.epochs):
         logstring = train(train_loader, model, criterion, optimizer, epoch)
-        val_loss = evaluate(val_loader, model, criterion)
-        if is_best > val_loss:
-            is_best = val_loss
-        logstring += "val_loss_cur=%f\tval_loss_best=%f\t" % (val_loss, is_best)
+        val_loss, fbeta_samples, fbeta_micro = evaluate(val_loader, model, criterion)
+        if is_best["score"] < fbeta_samples:
+            is_best["score"] = fbeta_samples
+            is_best["model_type"] = args.model
+            is_best["model"] = model.state_dict()
+        logstring += "val_loss=%f\tfbeta_samples_cur=%f\tfbeta_micro_cur=%f\tfbeta_samples_best=%f\t" % (val_loss, fbeta_samples, fbeta_micro, is_best["score"])
         if epoch%2 == 0:
             logger.info(logstring)
+
+    with open(os.path.join(foldername, 'params.json'), 'r') as f:
+        args = json.load(f)
+    args["best_val"] = is_best["score"]
+    args["model"] = is_best["model"].tobytes()
+    with open(os.path.join(foldername, 'params.json'), 'w') as f:
+        json.dump(args, f)
+
 
     
 
@@ -207,6 +229,9 @@ if __name__ == '__main__':
                         help="filepath where to create and save model runs and statistics")
     parser.add_argument("--model",
                         help="NN architecture to use")
+    parser.add_argument("--pretrained",
+                        default=True,
+                        help="Should be pretrained weights be used")
     parser.add_argument("--workers", 
                         type=int,
                         help="number of dataloading subprocesses")
@@ -243,6 +268,9 @@ if __name__ == '__main__':
 
     if not os.path.isdir(foldername):
         os.mkdir(foldername)
+    else:
+        for f in os.listdir(foldername):
+            os.remove(f)
 
     logger = logging.getLogger('')
     hdlr = logging.FileHandler(os.path.join(foldername, "logs.txt"), "a")
