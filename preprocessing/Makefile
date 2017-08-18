@@ -1,6 +1,8 @@
-RAW_DATA:= /u/cmishra1/understanding_amazon/data_raw
-PROCESSED_DATA:= /u/cmishra1/understanding_amazon/data_processed
-PYTHON_EXE:= /opt/share/Python-2.7.12/x86_64/bin/python
+SHELL := /bin/bash
+ROOT_DIR:= $(dir ${CURDIR})
+RAW_DATA:= $(ROOT_DIR)data_raw
+PROCESSED_DATA:= $(ROOT_DIR)data_processed
+PYTHON_EXE:= /opt/share/Python-3.5.2/x86_64/bin/python3
 
 EXTRACTION_TARGETS:= $(PROCESSED_DATA)/test-jpg $(PROCESSED_DATA)/targets.json $(PROCESSED_DATA)/train-jpg
 
