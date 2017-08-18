@@ -1,4 +1,3 @@
-
 run:
 	make clean
 	python3 gridsearch.py
@@ -11,3 +10,6 @@ clean:
 
 kill:
 	jbadmin -kill -proj understanding_amazon -state r all
+
+status:
+	jbinfo -summary -proj understanding_amazon -state r
