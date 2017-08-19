@@ -7,32 +7,36 @@ import torchvision.transforms as transforms
 import torch
 import torch.autograd as autograd
 import torch.nn as nn
-from satellitedata import SatelliteData
+from classes import SatelliteData, EvaluationObject
 from utils import AverageMeter
 import hashlib
 import time
 import logging
 from sklearn.metrics import fbeta_score
+import pickle
 
 logger = None
 
 def encode_args(args):
     return hashlib.sha224(str(args).encode()).hexdigest()
 
+def retrieve_alexnet(pretrained):
+    model = torchvision.models.alexnet(pretrained=pretrained)
+    model.classifier = nn.Sequential(
+        model.classifier[0],
+        model.classifier[1],
+        model.classifier[2],
+        model.classifier[3],
+        model.classifier[4],
+        model.classifier[5],
+        nn.Linear(4096, 17),
+    )
+    return model
+    
+
 def retrieve_model(model_param):
     if args.model == 'alexnet':
-        model = torchvision.models.alexnet(pretrained=args.pretrained)
-        model.classifier = nn.Sequential(
-            model.classifier[0],
-            model.classifier[1],
-            model.classifier[2],
-            model.classifier[3],
-            model.classifier[4],
-            model.classifier[5],
-            nn.Linear(4096, 17),
-        )
-        model.train()
-        return model
+        return retrieve_alexnet(args.pretrained).train()
     elif args.model == "densenet201":
         model = torchvision.models.densenet201(pretrained=args.pretrained)
     else:
@@ -101,7 +105,14 @@ def evaluate(val_loader, model, criterion):
     actual = torch.cat(actuals, 0).numpy()
     pred = torch.cat(preds, 0).numpy()
 
-    return losses.sum, f_score(actual, pred, 'samples'), f_score(actual, pred, 'micro')
+    evalObject = EvaluationObject(
+        val_loss=losses.sum,
+        fbeta_samples_cur=f_score(actual, pred, 'samples'),
+        fbeta_micro_cur=f_score(actual, pred, 'micro'),
+        pred=pred,
+        actual=actual,
+    )
+    return f_score(actual, pred, 'samples'), evalObject
 
 
 def train(train_loader, model, criterion, optimizer, epoch):
@@ -130,8 +141,13 @@ def train(train_loader, model, criterion, optimizer, epoch):
         batch_time.update(time.time() - end)
         end = time.time()
 
-    logstring = "epoch=%d\tdata_time=%f\tbatch_time=%f\ttrain_loss=%f\t" % (epoch, data_time.sum, batch_time.sum, losses.sum)
-    return logstring
+    logobjs = {
+        "epoch": epoch,
+        "data_time": data_time.sum,
+        "batch_time": batch_time.sum,
+        "train_loss": losses.sum,
+    }
+    return logobjs
     
 
 def train_model(args):
@@ -200,20 +216,27 @@ def train_model(args):
     if args.debug:
         args.epochs = 6
     for epoch in range(0, args.epochs):
-        logstring = train(train_loader, model, criterion, optimizer, epoch)
-        val_loss, fbeta_samples, fbeta_micro = evaluate(val_loader, model, criterion)
-        if is_best["score"] < fbeta_samples:
-            is_best["score"] = fbeta_samples
+        logobjs = train(train_loader, model, criterion, optimizer, epoch)
+        val_loss, fbeta_sa = evaluate(val_loader, model, criterion)
+        score, evalObject = evaluate(val_loader, model, criterion)
+        evalObject.add_logobjs(**logobjs)
+        if is_best["score"] < score:
+            is_best["score"] = score
             is_best["model_type"] = args.model
             is_best["model"] = model.state_dict()
-        logstring += "val_loss=%f\tfbeta_samples_cur=%f\tfbeta_micro_cur=%f\tfbeta_samples_best=%f\t" % (val_loss, fbeta_samples, fbeta_micro, is_best["score"])
+        logstring += evalObject.get_log()
         if epoch%2 == 0:
             logger.info(logstring)
+
+    torch.save(
+        is_best["model"], 
+        os.path.join(foldername, "best_model.tpy"),
+    )
 
     with open(os.path.join(foldername, 'params.json'), 'r') as f:
         args = json.load(f)
     args["best_val"] = is_best["score"]
-    args["model"] = is_best["model"].tobytes()
+
     with open(os.path.join(foldername, 'params.json'), 'w') as f:
         json.dump(args, f)
 

@@ -1,11 +1,4 @@
-# emacs autosaves
 *~
-*#
+#*
 
-# python autosaves
 *.pyc
-
-# data
-epoch_cache
-data_processed
-data_raw

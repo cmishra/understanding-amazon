@@ -37,3 +37,16 @@ class SatelliteData(torch.utils.data.Dataset):
         return len(self.images)
 
 
+class EvaluationObject():
+
+    def __init__(self, pred, actual, **kwargs):
+        self.pred = pred
+        self.actual = actual
+        self.toLog = kwargs
+
+    def get_log(self):
+        return json.dumps(self.toLog)
+
+    def add_logobjs(self, **kwards):
+        for k, v in kwards:
+            self.toLog[k] = v
